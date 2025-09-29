@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciador de Dados Compacto</title>
+    <title>Gerenciador de Dados com Persistência</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -166,17 +166,37 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            let data = [
-                { id: 1, nome: 'Ana Silva (Demo)', ra: '112233', senha: 'senha<_>123', enviado: true },
-                { id: 2, nome: 'Bruno Costa (Demo)', ra: '445566', senha: 'senha<->456', enviado: false },
-                { id: 3, nome: 'Carlos Dias (Demo)', ra: '778899', senha: 'senha<->789', enviado: true },
-            ];
+            const STORAGE_KEY = 'gerenciadorDeDadosApp';
             let editingId = null;
 
             const tableBody = document.getElementById('data-table-body');
             const fileInput = document.getElementById('file-input');
             const toast = document.getElementById('toast-notification');
             let toastTimeout;
+            
+            // --- FUNÇÕES DE DADOS ---
+            const saveData = () => {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            };
+
+            const loadData = () => {
+                const savedData = localStorage.getItem(STORAGE_KEY);
+                try {
+                    if (savedData) {
+                        return JSON.parse(savedData);
+                    }
+                } catch(e) {
+                    console.error("Erro ao carregar dados do localStorage", e);
+                }
+                // Se não houver dados salvos ou ocorrer um erro, retorna os dados de demonstração
+                return [
+                    { id: 1, nome: 'Ana Silva (Demo)', ra: '112233', senha: 'senha<_>123', enviado: true },
+                    { id: 2, nome: 'Bruno Costa (Demo)', ra: '445566', senha: 'senha<->456', enviado: false },
+                    { id: 3, nome: 'Carlos Dias (Demo)', ra: '778899', senha: 'senha<->789', enviado: true },
+                ];
+            };
+
+            let data = loadData();
 
             // --- FUNÇÕES UTILITÁRIAS ---
             const showToast = (message) => {
@@ -298,6 +318,7 @@
                     const itemIndex = data.findIndex(item => item.id === id);
                     if (itemIndex > -1) {
                         data[itemIndex].enviado = !data[itemIndex].enviado;
+                        saveData();
                         renderTable();
                     }
                     return;
@@ -312,6 +333,7 @@
                 } else if (buttonTarget.classList.contains('delete-btn')) {
                     if (confirm('Tem certeza que deseja excluir este registro?')) {
                         data = data.filter(item => item.id !== id);
+                        saveData();
                         renderTable();
                     }
                 } else if (buttonTarget.classList.contains('save-btn')) {
@@ -333,6 +355,7 @@
                         data[itemIndex] = { id, nome, ra, senha, enviado };
                     }
                     editingId = null;
+                    saveData();
                     renderTable();
                 } else if (buttonTarget.classList.contains('cancel-btn')) {
                     if (id === 0) data.shift();
@@ -345,7 +368,6 @@
             document.getElementById('add-btn').addEventListener('click', (e) => {
                 e.preventDefault();
                 if (editingId !== null) { alert('Salve ou cancele a edição atual.'); return; }
-                const newId = data.length > 0 ? Math.max(...data.map(i => i.id)) + 1 : 1;
                 data.unshift({ id: 0, nome: '', ra: '', senha: '', enviado: false });
                 editingId = 0;
                 renderTable();
@@ -402,6 +424,7 @@
                     }));
                 
                 data = formattedData; // SUBSTITUI os dados antigos pelos novos
+                saveData();
                 renderTable();
                 alert(`${formattedData.length} registros importados! Os dados anteriores foram substituídos.`);
             };
