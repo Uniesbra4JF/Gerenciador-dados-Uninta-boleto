@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Dados Compacto</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Bibliotecas Externas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Evita scroll na página inteira no desktop */
+            overflow: hidden; 
+        }
+
+        /* Estilo da Tabela Responsiva (Mobile-First) */
+        @media (max-width: 767px) {
+            body {
+                overflow: auto; /* Permite scroll no corpo no mobile */
+            }
+            .responsive-table {
+                min-width: 100%; /* FIX: Remove a largura mínima no celular para evitar overflow */
+            }
+            .responsive-table thead {
+                display: none; /* Esconde o cabeçalho da tabela no mobile */
+            }
+            .responsive-table tr {
+                display: block;
+                margin-bottom: 1rem;
+                border-radius: 0.75rem;
+                border: 1px solid #e5e7eb; /* border-gray-200 */
+                box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+                background-color: #ffffff; /* bg-white */
+                overflow: hidden; /* Garante que os cantos arredondados sejam aplicados */
+            }
+            .responsive-table td {
+                display: block; /* Empilha o conteúdo */
+                padding: 0.75rem 1rem;
+                border-bottom: 1px solid #f3f4f6;
+                text-align: left; /* Alinha todo o texto à esquerda para melhor leitura */
+                word-break: break-all;
+            }
+            .responsive-table td:last-child {
+                border-bottom: none;
+            }
+            .responsive-table td::before {
+                content: attr(data-label);
+                display: block;
+                font-size: 0.7rem; /* Rótulo menor e mais discreto */
+                color: #6b7280; /* text-gray-500 */
+                font-weight: 500;
+                margin-bottom: 0.2rem; /* Espaço compacto entre rótulo e valor */
+                text-transform: uppercase; /* Diferencia o rótulo */
+            }
+            .responsive-table td.actions-cell {
+                background-color: #f9fafb;
+                padding: 0.75rem;
+            }
+            .responsive-table td.actions-cell::before {
+                display: none; /* Sem rótulo para a célula de ações */
+            }
+            .responsive-table td.actions-cell > div {
+                width: 100%;
+            }
+             /* Estilo para inputs no modo de edição mobile */
+            .responsive-table td input[type="text"],
+            .responsive-table td input[type="number"] {
+                text-align: left;
+                font-size: 1rem;
+                padding: 0.25rem;
+            }
+        }
+        
+        /* Remove setas de input number */
+        input[type='number']::-webkit-outer-spin-button,
+        input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type='number'] { -moz-appearance: textfield; }
+
+        /* Estilos para a notificação "Copiado" */
+        #toast-notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #111827; /* bg-gray-900 */
+            color: white;
+            padding: 12px 24px;
+            border-radius: 9999px;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        #toast-notification.show {
+            opacity: 1;
+            visibility: visible;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 md:bg-gray-100">
+
+    <div id="app" class="h-screen w-screen flex flex-col bg-white">
+        <!-- Cabeçalho (Fixo no mobile) -->
+        <header class="sticky top-0 md:static z-20 bg-white bg-opacity-95 backdrop-blur-sm p-4 md:p-6 border-b border-gray-200 flex justify-between items-center gap-4">
+            <div>
+                <h1 class="text-xl md:text-2xl font-bold text-gray-800">Gerenciador de Dados</h1>
+                <p class="text-sm text-gray-500 hidden md:block">Gerencie seus registros de forma eficiente.</p>
+            </div>
+
+            <!-- Menu Dropdown de Ações -->
+            <div class="relative" id="menu-container">
+                <button id="menu-btn" class="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 active:scale-95 transition-all duration-200">
+                    <span>Ações</span>
+                    <i data-lucide="chevron-down" class="w-5 h-5 transition-transform duration-300"></i>
+                </button>
+                <div id="dropdown-menu" class="hidden absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl z-20 border border-gray-100">
+                    <div class="p-2">
+                        <a href="#" id="add-btn" class="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"><i data-lucide="plus-circle" class="w-5 h-5 text-blue-600"></i><span>Adicionar Registro</span></a>
+                        <a href="#" id="import-btn" class="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"><i data-lucide="upload" class="w-5 h-5 text-green-600"></i><span>Importar e Substituir</span></a>
+                        <div class="border-t border-gray-200 my-2"></div>
+                        <a href="#" id="export-excel-btn" class="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"><i data-lucide="file-spreadsheet" class="w-5 h-5 text-gray-600"></i><span>Exportar Excel (.xlsx)</span></a>
+                        <a href="#" id="export-json-btn" class="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"><i data-lucide="file-code" class="w-5 h-5 text-gray-600"></i><span>Exportar JSON (.json)</span></a>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <input type="file" id="file-input" class="hidden" accept=".xlsx, .json">
+
+        <!-- Container da Tabela (com scroll no desktop) -->
+        <div class="flex-1 overflow-auto p-4 md:p-6">
+            <div class="md:border md:border-gray-200 md:rounded-lg md:overflow-hidden">
+                <table class="w-full min-w-[600px] text-sm text-left text-gray-600 responsive-table">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3">Nome</th>
+                            <th scope="col" class="px-6 py-3">RA</th>
+                            <th scope="col" class="px-6 py-3">Senha</th>
+                            <th scope="col" class="px-6 py-3">Enviado mês X</th>
+                            <th scope="col" class="px-6 py-3 text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-table-body" class="md:divide-y md:divide-gray-200">
+                        <!-- Linhas da tabela/cards serão inseridas aqui -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <footer class="text-center text-xs text-gray-400 p-4 border-t border-gray-200 hidden md:block">
+            Powered by SheetJS & FileSaver.js
+        </footer>
+    </div>
+
+    <div id="toast-notification"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            let data = [
+                { id: 1, nome: 'Ana Silva (Demo)', ra: '112233', senha: 'senha<_>123', enviado: true },
+                { id: 2, nome: 'Bruno Costa (Demo)', ra: '445566', senha: 'senha<->456', enviado: false },
+                { id: 3, nome: 'Carlos Dias (Demo)', ra: '778899', senha: 'senha<->789', enviado: true },
+            ];
+            let editingId = null;
+
+            const tableBody = document.getElementById('data-table-body');
+            const fileInput = document.getElementById('file-input');
+            const toast = document.getElementById('toast-notification');
+            let toastTimeout;
+
+            // --- FUNÇÕES UTILITÁRIAS ---
+            const showToast = (message) => {
+                clearTimeout(toastTimeout);
+                toast.textContent = message;
+                toast.classList.add('show');
+                toastTimeout = setTimeout(() => toast.classList.remove('show'), 2000);
+            };
+
+            const copyToClipboard = (text) => {
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(text);
+                } else {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed'; ta.style.left = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    try { document.execCommand('copy'); } catch (err) { console.error('Falha ao copiar', err); }
+                    document.body.removeChild(ta);
+                }
+            };
+
+            // --- CONTROLE DO MENU ---
+            const menuBtn = document.getElementById('menu-btn');
+            const dropdownMenu = document.getElementById('dropdown-menu');
+            const menuIcon = menuBtn.querySelector('i');
+            
+            menuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isHidden = dropdownMenu.classList.toggle('hidden');
+                menuIcon.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(180deg)';
+            });
+
+            window.addEventListener('click', () => {
+                if (!dropdownMenu.classList.contains('hidden')) {
+                    dropdownMenu.classList.add('hidden');
+                    menuIcon.style.transform = 'rotate(0deg)';
+                }
+            });
+            dropdownMenu.addEventListener('click', (e) => e.stopPropagation());
+            document.getElementById('menu-container').addEventListener('click', (e) => {
+                if (e.target.closest('a')) {
+                     setTimeout(() => {
+                        if (!dropdownMenu.classList.contains('hidden')) {
+                           dropdownMenu.classList.add('hidden');
+                           menuIcon.style.transform = 'rotate(0deg)';
+                        }
+                     }, 100);
+                }
+            });
+
+            // --- RENDERIZAÇÃO ---
+            const renderTable = () => {
+                tableBody.innerHTML = '';
+                if (data.length === 0) {
+                    const emptyRow = `<tr class="bg-white"><td colspan="5" class="text-center p-8 text-gray-500">Nenhum registro encontrado.</td></tr>`;
+                    tableBody.innerHTML = emptyRow;
+                } else {
+                    data.forEach(item => {
+                        const row = document.createElement('tr');
+                        if (editingId === item.id) {
+                            // Modo de Edição
+                            row.innerHTML = `
+                                <td data-label="Nome"><input type="text" value="${item.nome}" name="nome" class="w-full bg-gray-100 border border-gray-300 rounded-md p-1"></td>
+                                <td data-label="RA"><input type="number" value="${item.ra}" name="ra" class="w-full bg-gray-100 border border-gray-300 rounded-md p-1" placeholder="Apenas números"></td>
+                                <td data-label="Senha"><input type="text" value="${item.senha}" name="senha" class="w-full bg-gray-100 border border-gray-300 rounded-md p-1"></td>
+                                <td data-label="Enviado">
+                                    <div class="flex items-center">
+                                      <input type="checkbox" ${item.enviado ? 'checked' : ''} name="enviado" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                    </div>
+                                </td>
+                                <td class="actions-cell">
+                                    <div class="flex justify-center gap-3">
+                                        <button class="save-btn flex items-center justify-center h-11 w-11 bg-green-100 text-green-600 rounded-full" data-id="${item.id}" title="Salvar"><i data-lucide="check" class="w-6 h-6"></i></button>
+                                        <button class="cancel-btn flex items-center justify-center h-11 w-11 bg-gray-200 text-gray-600 rounded-full" data-id="${item.id}" title="Cancelar"><i data-lucide="x" class="w-6 h-6"></i></button>
+                                    </div>
+                                </td>
+                            `;
+                        } else {
+                            // Modo de Visualização
+                            row.innerHTML = `
+                                <td data-label="Nome" class="font-medium text-gray-800">${item.nome}</td>
+                                <td data-label="RA" class="copyable cursor-pointer text-gray-800" title="Clique para copiar">${item.ra}</td>
+                                <td data-label="Senha" class="copyable cursor-pointer text-gray-800" title="Clique para copiar">${item.senha}</td>
+                                <td data-label="Enviado">
+                                    <span data-id="${item.id}" class="status-toggle cursor-pointer inline-block px-2 py-1 text-xs font-semibold leading-tight rounded-full transition-transform duration-200 hover:scale-105 ${item.enviado ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'}" title="Clique para alterar">
+                                        ${item.enviado ? 'Sim' : 'Não'}
+                                    </span>
+                                </td>
+                                <td class="actions-cell">
+                                    <div class="flex justify-center gap-3">
+                                        <button class="edit-btn flex items-center justify-center h-11 w-11 bg-blue-100 text-blue-600 rounded-full" data-id="${item.id}" title="Editar"><i data-lucide="edit-2" class="w-5 h-5"></i></button>
+                                        <button class="delete-btn flex items-center justify-center h-11 w-11 bg-red-100 text-red-600 rounded-full" data-id="${item.id}" title="Excluir"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                                    </div>
+                                </td>
+                            `;
+                        }
+                        tableBody.appendChild(row);
+                    });
+                }
+                lucide.createIcons();
+            };
+
+            // --- MANIPULADORES DE EVENTOS ---
+            tableBody.addEventListener('click', (e) => {
+                const buttonTarget = e.target.closest('button');
+                const cellTarget = e.target.closest('td.copyable');
+                const statusTarget = e.target.closest('.status-toggle');
+
+                if (cellTarget && !editingId) {
+                    copyToClipboard(cellTarget.textContent.trim());
+                    showToast(`${cellTarget.dataset.label} copiado!`);
+                    return;
+                }
+                
+                if (statusTarget && !editingId) {
+                    const id = parseInt(statusTarget.dataset.id);
+                    const itemIndex = data.findIndex(item => item.id === id);
+                    if (itemIndex > -1) {
+                        data[itemIndex].enviado = !data[itemIndex].enviado;
+                        renderTable();
+                    }
+                    return;
+                }
+
+                if (!buttonTarget) return;
+                const id = parseInt(buttonTarget.dataset.id);
+
+                if (buttonTarget.classList.contains('edit-btn')) {
+                    editingId = id;
+                    renderTable();
+                } else if (buttonTarget.classList.contains('delete-btn')) {
+                    if (confirm('Tem certeza que deseja excluir este registro?')) {
+                        data = data.filter(item => item.id !== id);
+                        renderTable();
+                    }
+                } else if (buttonTarget.classList.contains('save-btn')) {
+                    const row = buttonTarget.closest('tr');
+                    const nome = row.querySelector('input[name="nome"]').value;
+                    const ra = row.querySelector('input[name="ra"]').value;
+                    const senha = row.querySelector('input[name="senha"]').value;
+                    const enviado = row.querySelector('input[name="enviado"]').checked;
+                    
+                    if (!/^\d*$/.test(ra)) { alert("O campo RA deve conter apenas números."); return; }
+                    if (!nome || !ra || !senha) { alert("Por favor, preencha todos os campos."); return; }
+
+                    if (id === 0) {
+                        const newId = data.length > 0 ? Math.max(...data.map(i => i.id)) + 1 : 1;
+                        data.shift();
+                        data.unshift({ id: newId, nome, ra, senha, enviado });
+                    } else {
+                        const itemIndex = data.findIndex(item => item.id === id);
+                        data[itemIndex] = { id, nome, ra, senha, enviado };
+                    }
+                    editingId = null;
+                    renderTable();
+                } else if (buttonTarget.classList.contains('cancel-btn')) {
+                    if (id === 0) data.shift();
+                    editingId = null;
+                    renderTable();
+                }
+            });
+            
+            // --- AÇÕES DO MENU ---
+            document.getElementById('add-btn').addEventListener('click', (e) => {
+                e.preventDefault();
+                if (editingId !== null) { alert('Salve ou cancele a edição atual.'); return; }
+                const newId = data.length > 0 ? Math.max(...data.map(i => i.id)) + 1 : 1;
+                data.unshift({ id: 0, nome: '', ra: '', senha: '', enviado: false });
+                editingId = 0;
+                renderTable();
+                window.scrollTo(0, 0);
+            });
+
+            document.getElementById('import-btn').addEventListener('click', (e) => {
+                e.preventDefault();
+                fileInput.click();
+            });
+            
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                if (file.name.endsWith('.xlsx')) {
+                    reader.onload = (e) => {
+                        const wb = XLSX.read(e.target.result, { type: 'binary' });
+                        const sheet = wb.Sheets[wb.SheetNames[0]];
+                        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+                        
+                        const jsonData = rows.slice(1).map(row => ({
+                            nome: row[0], ra: row[1], senha: row[2]
+                        }));
+                        importData(jsonData);
+                    };
+                    reader.readAsBinaryString(file);
+                } else if (file.name.endsWith('.json')) {
+                    reader.onload = (e) => {
+                       try {
+                            importData(JSON.parse(e.target.result));
+                        } catch (err) {
+                            alert('Erro ao processar o arquivo JSON. Verifique o formato.');
+                        }
+                    };
+                    reader.readAsText(file);
+                } else {
+                    alert('Formato de arquivo não suportado (.xlsx ou .json).');
+                }
+                fileInput.value = ''; 
+            });
+
+            const importData = (newData) => {
+                if (!Array.isArray(newData)) { alert('Dados importados inválidos.'); return; }
+                
+                const formattedData = newData
+                    .filter(item => item.nome && item.ra && item.senha)
+                    .map((item, index) => ({
+                        id: index + 1, // IDs reiniciam e seguem a ordem do arquivo
+                        nome: String(item.nome),
+                        ra: String(item.ra).replace(/\D/g, ''),
+                        senha: String(item.senha),
+                        enviado: ['sim', 'true', '1', true].includes(String(item.enviado).toLowerCase())
+                    }));
+                
+                data = formattedData; // SUBSTITUI os dados antigos pelos novos
+                renderTable();
+                alert(`${formattedData.length} registros importados! Os dados anteriores foram substituídos.`);
+            };
+
+            document.getElementById('export-json-btn').addEventListener('click', (e) => {
+                e.preventDefault();
+                if (data.length === 0) { alert('Não há dados para exportar.'); return; }
+                const blob = new Blob([JSON.stringify(data.map(({id, ...rest}) => rest), null, 2)], { type: 'application/json' });
+                saveAs(blob, 'dados.json');
+            });
+
+            document.getElementById('export-excel-btn').addEventListener('click', (e) => {
+                e.preventDefault();
+                if (data.length === 0) { alert('Não há dados para exportar.'); return; }
+                const dataToExport = data.map(item => ({
+                    'Nome': item.nome, 'RA': item.ra, 'Senha': item.senha, 'Enviado mês X': item.enviado ? 'Sim' : 'Não'
+                }));
+                const ws = XLSX.utils.json_to_sheet(dataToExport);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+                XLSX.writeFile(wb, 'dados.xlsx');
+            });
+            
+            renderTable(); // Renderização inicial
+        });
+    </script>
+</body>
+</html>
+
+
