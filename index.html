@@ -1,454 +1,509 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciador de Dados com Persistência</title>
-    
-    <!-- Tailwind CSS -->
+    <title>Festejo 9 Noites - Gestão de Arrecadação</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Bibliotecas Externas -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-
+    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            /* Evita scroll na página inteira no desktop */
-            overflow: hidden; 
-        }
-
-        /* Estilo da Tabela Responsiva (Mobile-First) */
-        @media (max-width: 767px) {
-            body {
-                overflow: auto; /* Permite scroll no corpo no mobile */
-            }
-            .responsive-table {
-                min-width: 100%; /* FIX: Remove a largura mínima no celular para evitar overflow */
-            }
-            .responsive-table thead {
-                display: none; /* Esconde o cabeçalho da tabela no mobile */
-            }
-            .responsive-table tr {
-                display: block;
-                margin-bottom: 1rem;
-                border-radius: 0.75rem;
-                border: 1px solid #e5e7eb; /* border-gray-200 */
-                box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
-                background-color: #ffffff; /* bg-white */
-                overflow: hidden; /* Garante que os cantos arredondados sejam aplicados */
-            }
-            .responsive-table td {
-                display: block; /* Empilha o conteúdo */
-                padding: 0.75rem 1rem;
-                border-bottom: 1px solid #f3f4f6;
-                text-align: left; /* Alinha todo o texto à esquerda para melhor leitura */
-                word-break: break-all;
-            }
-            .responsive-table td:last-child {
-                border-bottom: none;
-            }
-            .responsive-table td::before {
-                content: attr(data-label);
-                display: block;
-                font-size: 0.7rem; /* Rótulo menor e mais discreto */
-                color: #6b7280; /* text-gray-500 */
-                font-weight: 500;
-                margin-bottom: 0.2rem; /* Espaço compacto entre rótulo e valor */
-                text-transform: uppercase; /* Diferencia o rótulo */
-            }
-            .responsive-table td.actions-cell {
-                background-color: #f9fafb;
-                padding: 0.75rem;
-            }
-            .responsive-table td.actions-cell::before {
-                display: none; /* Sem rótulo para a célula de ações */
-            }
-            .responsive-table td.actions-cell > div {
-                width: 100%;
-            }
-             /* Estilo para inputs no modo de edição mobile */
-            .responsive-table td input[type="text"],
-            .responsive-table td input[type="number"] {
-                text-align: left;
-                font-size: 1rem;
-                padding: 0.25rem;
-            }
-        }
-        
-        /* Remove setas de input number */
-        input[type='number']::-webkit-outer-spin-button,
-        input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type='number'] { -moz-appearance: textfield; }
-
-        /* Estilos para a notificação "Copiado" */
-        #toast-notification {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
             background-color: #111827; /* bg-gray-900 */
-            color: white;
-            padding: 12px 24px;
-            border-radius: 9999px;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
         }
-        #toast-notification.show {
-            opacity: 1;
-            visibility: visible;
+        /* Custom scrollbar for a more modern look */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937; /* bg-gray-800 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4d7c0f; /* Cor verde/dourado */
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #65a30d;
+        }
+        .gold-text {
+            color: #ca8a04; /* text-yellow-600 */
+        }
+        .btn-primary {
+            @apply bg-lime-700 hover:bg-lime-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 shadow-md;
+        }
+        .btn-secondary {
+             @apply bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 shadow-md;
+        }
+        textarea::placeholder {
+            white-space: pre-line;
         }
     </style>
 </head>
-<body class="bg-gray-50 md:bg-gray-100">
+<body class="text-gray-200">
 
-    <div id="app" class="h-screen w-screen flex flex-col bg-white">
-        <!-- Cabeçalho (Fixo no mobile) -->
-        <header class="sticky top-0 md:static z-20 bg-white bg-opacity-95 backdrop-blur-sm p-4 md:p-6 border-b border-gray-200 flex justify-between items-center gap-4">
-            <div>
-                <h1 class="text-xl md:text-2xl font-bold text-gray-800">Gerenciador de Dados</h1>
-                <p class="text-sm text-gray-500 hidden md:block">Gerencie seus registros de forma eficiente.</p>
-            </div>
-
-            <!-- Menu Dropdown de Ações -->
-            <div class="relative" id="menu-container">
-                <button id="menu-btn" class="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 active:scale-95 transition-all duration-200">
-                    <span>Ações</span>
-                    <i data-lucide="chevron-down" class="w-5 h-5 transition-transform duration-300"></i>
-                </button>
-                <div id="dropdown-menu" class="hidden absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl z-20 border border-gray-100">
-                    <div class="p-2">
-                        <a href="#" id="add-btn" class="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"><i data-lucide="plus-circle" class="w-5 h-5 text-blue-600"></i><span>Adicionar Registro</span></a>
-                        <a href="#" id="import-btn" class="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"><i data-lucide="upload" class="w-5 h-5 text-green-600"></i><span>Importar e Substituir</span></a>
-                        <div class="border-t border-gray-200 my-2"></div>
-                        <a href="#" id="export-excel-btn" class="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"><i data-lucide="file-spreadsheet" class="w-5 h-5 text-gray-600"></i><span>Exportar Excel (.xlsx)</span></a>
-                        <a href="#" id="export-json-btn" class="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"><i data-lucide="file-code" class="w-5 h-5 text-gray-600"></i><span>Exportar JSON (.json)</span></a>
-                    </div>
-                </div>
-            </div>
-        </header>
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
         
-        <input type="file" id="file-input" class="hidden" accept=".xlsx, .json">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold gold-text tracking-wider">FESTEJO 9 NOITES</h1>
+            <p class="text-gray-400 mt-2">Gestão de Arrecadação - Salvo Localmente</p>
+        </header>
 
-        <!-- Container da Tabela (com scroll no desktop) -->
-        <div class="flex-1 overflow-auto p-4 md:p-6">
-            <div class="md:border md:border-gray-200 md:rounded-lg md:overflow-hidden">
-                <table class="w-full min-w-[600px] text-sm text-left text-gray-600 responsive-table">
-                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-6 py-3">Nome</th>
-                            <th scope="col" class="px-6 py-3">RA</th>
-                            <th scope="col" class="px-6 py-3">Senha</th>
-                            <th scope="col" class="px-6 py-3">Enviado mês X</th>
-                            <th scope="col" class="px-6 py-3 text-center">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="data-table-body" class="md:divide-y md:divide-gray-200">
-                        <!-- Linhas da tabela/cards serão inseridas aqui -->
-                    </tbody>
-                </table>
+        <!-- Nights Grid -->
+        <main id="nights-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Cards will be injected by JavaScript -->
+        </main>
+
+        <!-- General Summary -->
+        <section id="summary" class="bg-gray-800 p-6 rounded-2xl shadow-lg">
+            <h2 class="text-2xl font-bold mb-4 border-b-2 border-lime-700 pb-2 gold-text">Resumo Geral</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-lg">
+                <div id="total-oferta" class="bg-gray-900 p-4 rounded-lg"></div>
+                <div id="total-leilao" class="bg-gray-900 p-4 rounded-lg"></div>
+                <div id="total-barraca" class="bg-gray-900 p-4 rounded-lg"></div>
             </div>
-        </div>
+            <div id="grand-total" class="bg-lime-800 text-white text-2xl font-bold p-4 rounded-lg text-center tracking-widest">
+                <!-- Grand total will be injected here -->
+            </div>
+        </section>
 
-        <footer class="text-center text-xs text-gray-400 p-4 border-t border-gray-200 hidden md:block">
-            Powered by SheetJS & FileSaver.js
-        </footer>
+        <!-- Actions -->
+        <section class="mt-8 flex flex-col sm:flex-row flex-wrap justify-center items-center gap-4">
+            <button id="report-btn" class="btn-primary w-full sm:w-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 4a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H5zm-1 9v-1h5v2H5a1 1 0 01-1-1zm7 1h4a1 1 0 001-1v-1h-5v2zm0-4h5V8h-5v2zM4 8h5v2H4V8z" clip-rule="evenodd" /></svg>
+                Gerar Relatório
+            </button>
+            <button id="copy-report-btn" class="btn-secondary w-full sm:w-auto">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z" /><path d="M4 3a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H4z" /></svg>
+                Copiar Relatório
+            </button>
+            <button id="export-btn" class="btn-secondary w-full sm:w-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 9.707a1 1 0 011.414 0L9 11.086V3a1 1 0 112 0v8.086l1.293-1.379a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                Exportar JSON
+            </button>
+            <label for="import-file" class="btn-secondary w-full sm:w-auto cursor-pointer text-center">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 9.707a1 1 0 011.414 0L9 11.086V3a1 1 0 112 0v8.086l1.293-1.379a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" transform="rotate(180 10 10)" /></svg>
+                Importar JSON
+            </label>
+            <input type="file" id="import-file" class="hidden" accept=".json">
+        </section>
+
     </div>
 
-    <div id="toast-notification"></div>
+    <!-- Modal for Editing -->
+    <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50 hidden transition-opacity duration-300">
+        <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl w-11/12 max-w-md transform transition-transform duration-300 scale-95">
+            <h2 id="modal-title" class="text-2xl font-bold mb-6 gold-text">Registrar Valores</h2>
+            <form id="edit-form">
+                <input type="hidden" id="edit-night-id">
+                <div class="mb-4">
+                    <label for="descricao" class="block text-gray-400 mb-2">✏️ Descrição (Ex: Noiteiros, Atração)</label>
+                    <textarea id="descricao" rows="3" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg p-3 focus:border-lime-600 focus:ring-lime-600 outline-none transition-colors" placeholder="Família Silva&#10;Atração: Zé Vaqueiro"></textarea>
+                </div>
+                <div class="mb-4">
+                    <label for="oferta" class="block text-gray-400 mb-2">💰 Oferta</label>
+                    <input type="number" id="oferta" step="0.01" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg p-3 focus:border-lime-600 focus:ring-lime-600 outline-none transition-colors" placeholder="R$ 0,00">
+                </div>
+                <div class="mb-4">
+                    <label for="leilao" class="block text-gray-400 mb-2">🎉 Leilão</label>
+                    <input type="number" id="leilao" step="0.01" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg p-3 focus:border-lime-600 focus:ring-lime-600 outline-none transition-colors" placeholder="R$ 0,00">
+                </div>
+                <div class="mb-6">
+                    <label for="barraca" class="block text-gray-400 mb-2">🍴 Barraca</label>
+                    <input type="number" id="barraca" step="0.01" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg p-3 focus:border-lime-600 focus:ring-lime-600 outline-none transition-colors" placeholder="R$ 0,00">
+                </div>
+                <div class="flex justify-end gap-4">
+                    <button type="button" id="cancel-btn" class="btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-lime-600 text-white py-2 px-5 rounded-lg shadow-lg opacity-0 translate-y-10 transition-all duration-500">
+        <!-- Message here -->
+    </div>
+
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const STORAGE_KEY = 'gerenciadorDeDadosApp';
-            let editingId = null;
+            const nightsGrid = document.getElementById('nights-grid');
+            const totalOfertaEl = document.getElementById('total-oferta');
+            const totalLeilaoEl = document.getElementById('total-leilao');
+            const totalBarracaEl = document.getElementById('total-barraca');
+            const grandTotalEl = document.getElementById('grand-total');
+            const modal = document.getElementById('edit-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const editForm = document.getElementById('edit-form');
+            const cancelBtn = document.getElementById('cancel-btn');
+            const editNightIdInput = document.getElementById('edit-night-id');
+            const descricaoInput = document.getElementById('descricao');
+            const ofertaInput = document.getElementById('oferta');
+            const leilaoInput = document.getElementById('leilao');
+            const barracaInput = document.getElementById('barraca');
+            const exportBtn = document.getElementById('export-btn');
+            const importFile = document.getElementById('import-file');
+            const reportBtn = document.getElementById('report-btn');
+            const copyReportBtn = document.getElementById('copy-report-btn');
+            const toast = document.getElementById('toast');
 
-            const tableBody = document.getElementById('data-table-body');
-            const fileInput = document.getElementById('file-input');
-            const toast = document.getElementById('toast-notification');
-            let toastTimeout;
+            let nightsData = [];
+
+            // --- Utility Functions ---
+
+            const formatCurrency = (value) => {
+                return new Intl.NumberFormat('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL'
+                }).format(value);
+            };
             
-            // --- FUNÇÕES DE DADOS ---
-            const saveData = () => {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-            };
-
-            const loadData = () => {
-                const savedData = localStorage.getItem(STORAGE_KEY);
-                try {
-                    if (savedData) {
-                        return JSON.parse(savedData);
-                    }
-                } catch(e) {
-                    console.error("Erro ao carregar dados do localStorage", e);
-                }
-                // Se não houver dados salvos ou ocorrer um erro, retorna os dados de demonstração
-                return [
-                    { id: 1, nome: 'Ana Silva (Demo)', ra: '112233', senha: 'senha<_>123', enviado: true },
-                    { id: 2, nome: 'Bruno Costa (Demo)', ra: '445566', senha: 'senha<->456', enviado: false },
-                    { id: 3, nome: 'Carlos Dias (Demo)', ra: '778899', senha: 'senha<->789', enviado: true },
-                ];
-            };
-
-            let data = loadData();
-
-            // --- FUNÇÕES UTILITÁRIAS ---
-            const showToast = (message) => {
-                clearTimeout(toastTimeout);
+            const showToast = (message, isError = false) => {
                 toast.textContent = message;
-                toast.classList.add('show');
-                toastTimeout = setTimeout(() => toast.classList.remove('show'), 2000);
+                toast.classList.remove('opacity-0', 'translate-y-10');
+                if(isError) {
+                    toast.classList.remove('bg-lime-600');
+                    toast.classList.add('bg-red-600');
+                } else {
+                    toast.classList.add('bg-lime-600');
+                    toast.classList.remove('bg-red-600');
+                }
+
+                setTimeout(() => {
+                    toast.classList.add('opacity-0', 'translate-y-10');
+                }, 3000);
             };
 
             const copyToClipboard = (text) => {
-                if (navigator.clipboard && window.isSecureContext) {
-                    navigator.clipboard.writeText(text);
-                } else {
-                    const ta = document.createElement('textarea');
-                    ta.value = text;
-                    ta.style.position = 'fixed'; ta.style.left = '-9999px';
-                    document.body.appendChild(ta);
-                    ta.select();
-                    try { document.execCommand('copy'); } catch (err) { console.error('Falha ao copiar', err); }
-                    document.body.removeChild(ta);
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast('Relatório copiado com sucesso!');
+                } catch (err) {
+                    showToast('Falha ao copiar o relatório.', true);
                 }
+                document.body.removeChild(textarea);
             };
 
-            // --- CONTROLE DO MENU ---
-            const menuBtn = document.getElementById('menu-btn');
-            const dropdownMenu = document.getElementById('dropdown-menu');
-            const menuIcon = menuBtn.querySelector('i');
-            
-            menuBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const isHidden = dropdownMenu.classList.toggle('hidden');
-                menuIcon.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(180deg)';
-            });
+            // --- Data Persistence ---
 
-            window.addEventListener('click', () => {
-                if (!dropdownMenu.classList.contains('hidden')) {
-                    dropdownMenu.classList.add('hidden');
-                    menuIcon.style.transform = 'rotate(0deg)';
-                }
-            });
-            dropdownMenu.addEventListener('click', (e) => e.stopPropagation());
-            document.getElementById('menu-container').addEventListener('click', (e) => {
-                if (e.target.closest('a')) {
-                     setTimeout(() => {
-                        if (!dropdownMenu.classList.contains('hidden')) {
-                           dropdownMenu.classList.add('hidden');
-                           menuIcon.style.transform = 'rotate(0deg)';
-                        }
-                     }, 100);
-                }
-            });
+            const saveData = () => {
+                localStorage.setItem('festejoData', JSON.stringify(nightsData));
+            };
 
-            // --- RENDERIZAÇÃO ---
-            const renderTable = () => {
-                tableBody.innerHTML = '';
-                if (data.length === 0) {
-                    const emptyRow = `<tr class="bg-white"><td colspan="5" class="text-center p-8 text-gray-500">Nenhum registro encontrado.</td></tr>`;
-                    tableBody.innerHTML = emptyRow;
-                } else {
-                    data.forEach(item => {
-                        const row = document.createElement('tr');
-                        if (editingId === item.id) {
-                            // Modo de Edição
-                            row.innerHTML = `
-                                <td data-label="Nome"><input type="text" value="${item.nome}" name="nome" class="w-full bg-gray-100 border border-gray-300 rounded-md p-1"></td>
-                                <td data-label="RA"><input type="number" value="${item.ra}" name="ra" class="w-full bg-gray-100 border border-gray-300 rounded-md p-1" placeholder="Apenas números"></td>
-                                <td data-label="Senha"><input type="text" value="${item.senha}" name="senha" class="w-full bg-gray-100 border border-gray-300 rounded-md p-1"></td>
-                                <td data-label="Enviado">
-                                    <div class="flex items-center">
-                                      <input type="checkbox" ${item.enviado ? 'checked' : ''} name="enviado" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                    </div>
-                                </td>
-                                <td class="actions-cell">
-                                    <div class="flex justify-center gap-3">
-                                        <button class="save-btn flex items-center justify-center h-11 w-11 bg-green-100 text-green-600 rounded-full" data-id="${item.id}" title="Salvar"><i data-lucide="check" class="w-6 h-6"></i></button>
-                                        <button class="cancel-btn flex items-center justify-center h-11 w-11 bg-gray-200 text-gray-600 rounded-full" data-id="${item.id}" title="Cancelar"><i data-lucide="x" class="w-6 h-6"></i></button>
-                                    </div>
-                                </td>
-                            `;
+            const loadData = () => {
+                const savedData = localStorage.getItem('festejoData');
+                if (savedData) {
+                    try {
+                        let parsedData = JSON.parse(savedData);
+                        if(Array.isArray(parsedData) && parsedData.length === 9) {
+                           parsedData.forEach(night => {
+                               if (night.descricao === undefined) night.descricao = '';
+                           });
+                           nightsData = parsedData;
                         } else {
-                            // Modo de Visualização
-                            row.innerHTML = `
-                                <td data-label="Nome" class="font-medium text-gray-800">${item.nome}</td>
-                                <td data-label="RA" class="copyable cursor-pointer text-gray-800" title="Clique para copiar">${item.ra}</td>
-                                <td data-label="Senha" class="copyable cursor-pointer text-gray-800" title="Clique para copiar">${item.senha}</td>
-                                <td data-label="Enviado">
-                                    <span data-id="${item.id}" class="status-toggle cursor-pointer inline-block px-2 py-1 text-xs font-semibold leading-tight rounded-full transition-transform duration-200 hover:scale-105 ${item.enviado ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'}" title="Clique para alterar">
-                                        ${item.enviado ? 'Sim' : 'Não'}
-                                    </span>
-                                </td>
-                                <td class="actions-cell">
-                                    <div class="flex justify-center gap-3">
-                                        <button class="edit-btn flex items-center justify-center h-11 w-11 bg-blue-100 text-blue-600 rounded-full" data-id="${item.id}" title="Editar"><i data-lucide="edit-2" class="w-5 h-5"></i></button>
-                                        <button class="delete-btn flex items-center justify-center h-11 w-11 bg-red-100 text-red-600 rounded-full" data-id="${item.id}" title="Excluir"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
-                                    </div>
-                                </td>
-                            `;
+                            throw new Error("Invalid data format");
                         }
-                        tableBody.appendChild(row);
-                    });
+                    } catch (error) {
+                        console.error("Failed to load data, initializing fresh.", error);
+                        initializeData();
+                    }
+                } else {
+                    initializeData();
                 }
-                lucide.createIcons();
+            };
+            
+            const initializeData = () => {
+                nightsData = Array.from({ length: 9 }, (_, i) => ({
+                    id: i + 1,
+                    descricao: '',
+                    oferta: 0,
+                    leilao: 0,
+                    barraca: 0
+                }));
             };
 
-            // --- MANIPULADORES DE EVENTOS ---
-            tableBody.addEventListener('click', (e) => {
-                const buttonTarget = e.target.closest('button');
-                const cellTarget = e.target.closest('td.copyable');
-                const statusTarget = e.target.closest('.status-toggle');
+            // --- UI Rendering ---
 
-                if (cellTarget && !editingId) {
-                    copyToClipboard(cellTarget.textContent.trim());
-                    showToast(`${cellTarget.dataset.label} copiado!`);
-                    return;
-                }
+            const render = () => {
+                nightsGrid.innerHTML = '';
+                let totalOferta = 0, totalLeilao = 0, totalBarraca = 0;
+
+                nightsData.forEach(night => {
+                    const nightTotal = night.oferta + night.leilao + night.barraca;
+                    totalOferta += night.oferta;
+                    totalLeilao += night.leilao;
+                    totalBarraca += night.barraca;
+
+                    const lines = night.descricao.split('\n').filter(line => line.trim() !== '');
+                    const firstLine = lines[0] || 'Sem descrição';
+                    const hasMoreLines = lines.length > 1;
+
+                    const card = document.createElement('div');
+                    card.className = 'bg-gray-800 p-5 rounded-2xl shadow-lg flex flex-col justify-between';
+                    card.innerHTML = `
+                        <div>
+                            <h3 class="text-xl font-bold gold-text mb-2">NOITE ${night.id}</h3>
+                            <div class="description-container mb-4 min-h-[44px]">
+                                <p class="text-sm text-gray-400 whitespace-pre-wrap">${firstLine}</p>
+                                ${hasMoreLines ? `<button data-expand-id="${night.id}" class="expand-btn text-lime-400 text-xs hover:underline mt-1">Ver mais</button>` : ''}
+                            </div>
+                            <div class="space-y-2 text-gray-300">
+                                <p>💰 Oferta: <span class="font-semibold float-right">${formatCurrency(night.oferta)}</span></p>
+                                <p>🎉 Leilão: <span class="font-semibold float-right">${formatCurrency(night.leilao)}</span></p>
+                                <p>🍴 Barraca: <span class="font-semibold float-right">${formatCurrency(night.barraca)}</span></p>
+                            </div>
+                        </div>
+                        <div class="mt-4 pt-4 border-t-2 border-gray-700">
+                           <p class="text-lg font-bold">Total da Noite: <span class="float-right gold-text">${formatCurrency(nightTotal)}</span></p>
+                           <button data-id="${night.id}" class="register-btn w-full mt-4 btn-secondary">Detalhes / Registrar</button>
+                        </div>
+                    `;
+                    nightsGrid.appendChild(card);
+                });
+
+                // Update Summary
+                totalOfertaEl.innerHTML = `<span class="text-gray-400">Total Oferta:</span> <strong class="float-right text-lg">${formatCurrency(totalOferta)}</strong>`;
+                totalLeilaoEl.innerHTML = `<span class="text-gray-400">Total Leilão:</span> <strong class="float-right text-lg">${formatCurrency(totalLeilao)}</strong>`;
+                totalBarracaEl.innerHTML = `<span class="text-gray-400">Total Barraca:</span> <strong class="float-right text-lg">${formatCurrency(totalBarraca)}</strong>`;
+                grandTotalEl.innerHTML = `TOTAL GERAL: ${formatCurrency(totalOferta + totalLeilao + totalBarraca)}`;
+            };
+
+            // --- Report Generation ---
+            
+            const generatePlainTextReport = () => {
+                let report = '📊 *RELATÓRIO DO FESTEJO*\n\n';
+                let totalOferta = 0, totalLeilao = 0, totalBarraca = 0;
+
+                nightsData.forEach(n => {
+                    totalOferta += n.oferta;
+                    totalLeilao += n.leilao;
+                    totalBarraca += n.barraca;
+                });
+                const grandTotal = totalOferta + totalLeilao + totalBarraca;
+
+                report += '*Resumo Geral:*\n';
+                report += `💰 Ofertas: ${formatCurrency(totalOferta)}\n`;
+                report += `🎉 Leilões: ${formatCurrency(totalLeilao)}\n`;
+                report += `🍴 Barracas: ${formatCurrency(totalBarraca)}\n`;
+                report += `*Total Geral: ${formatCurrency(grandTotal)}*\n\n`;
+                report += '------------------------\n\n';
+                report += '*Detalhes por Noite:*\n\n';
+
+                nightsData.forEach(n => {
+                    const nightTotal = n.oferta + n.leilao + n.barraca;
+                    report += `*NOITE ${n.id}* - Total: ${formatCurrency(nightTotal)}\n`;
+                    if (n.descricao) {
+                        report += `_${n.descricao.replace(/\n/g, ', ')}_\n`;
+                    }
+                    report += ` • Oferta: ${formatCurrency(n.oferta)}\n`;
+                    report += ` • Leilão: ${formatCurrency(n.leilao)}\n`;
+                    report += ` • Barraca: ${formatCurrency(n.barraca)}\n\n`;
+                });
                 
-                if (statusTarget && !editingId) {
-                    const id = parseInt(statusTarget.dataset.id);
-                    const itemIndex = data.findIndex(item => item.id === id);
-                    if (itemIndex > -1) {
-                        data[itemIndex].enviado = !data[itemIndex].enviado;
-                        saveData();
-                        renderTable();
-                    }
-                    return;
+                return report;
+            };
+
+            const generateHtmlReport = () => {
+                let totalOferta = 0, totalLeilao = 0, totalBarraca = 0;
+                nightsData.forEach(n => {
+                    totalOferta += n.oferta;
+                    totalLeilao += n.leilao;
+                    totalBarraca += n.barraca;
+                });
+                const grandTotal = totalOferta + totalLeilao + totalBarraca;
+
+                let reportHtml = `
+                    <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+                    <title>Relatório do Festejo</title>
+                    <style>
+                        body { font-family: sans-serif; margin: 2rem; color: #333; }
+                        h1, h2, h3 { color: #111; }
+                        h1 { text-align: center; }
+                        .summary, .night-details { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; }
+                        .summary h3 { font-size: 1.5rem; text-align: center; background: #eee; padding: 0.5rem; border-radius: 4px; }
+                        .night { border-bottom: 1px solid #eee; padding-bottom: 1rem; margin-bottom: 1rem; }
+                        .night:last-child { border-bottom: none; }
+                        .night h3 { margin-top: 0; }
+                        .night-total { font-weight: bold; }
+                        .description { white-space: pre-wrap; color: #555; font-style: italic; background-color: #f9f9f9; padding: 0.5rem; border-radius: 4px; margin-bottom: 1rem;}
+                        @media print {
+                            body { margin: 1rem; }
+                            .no-print { display: none; }
+                        }
+                        button { font-size: 1rem; padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid #ccc; cursor: pointer; background: #f0f0f0; margin-top: 1rem; }
+                        button:hover { background: #e0e0e0; }
+                    </style>
+                    </head><body>
+                    <h1>Relatório do Festejo - 9 Noites</h1>
+                    <div class="summary">
+                        <h2>Resumo Geral</h2>
+                        <p>Total Oferta: <strong>${formatCurrency(totalOferta)}</strong></p>
+                        <p>Total Leilão: <strong>${formatCurrency(totalLeilao)}</strong></p>
+                        <p>Total Barraca: <strong>${formatCurrency(totalBarraca)}</strong></p>
+                        <h3>Total Geral: ${formatCurrency(grandTotal)}</h3>
+                    </div>
+                    <div class="night-details">
+                    <h2>Detalhes por Noite</h2>
+                `;
+                
+                nightsData.forEach(n => {
+                    const nightTotal = n.oferta + n.leilao + n.barraca;
+                    reportHtml += `
+                        <div class="night">
+                            <h3>NOITE ${n.id}</h3>
+                            ${n.descricao ? `<p class="description">${n.descricao}</p>` : ''}
+                            <p>Oferta: ${formatCurrency(n.oferta)}</p>
+                            <p>Leilão: ${formatCurrency(n.leilao)}</p>
+                            <p>Barraca: ${formatCurrency(n.barraca)}</p>
+                            <p class="night-total">Total da Noite: ${formatCurrency(nightTotal)}</p>
+                        </div>`;
+                });
+
+                reportHtml += `
+                    </div>
+                    <button class="no-print" onclick="window.print()">Imprimir / Salvar PDF</button>
+                    </body></html>
+                `;
+                return reportHtml;
+            };
+
+
+            // --- Modal Logic ---
+            
+            const openModal = (nightId) => {
+                const night = nightsData.find(n => n.id === nightId);
+                if (!night) return;
+
+                modalTitle.textContent = `Registrar Valores - NOITE ${nightId}`;
+                editNightIdInput.value = night.id;
+                descricaoInput.value = night.descricao || '';
+                ofertaInput.value = night.oferta || '';
+                leilaoInput.value = night.leilao || '';
+                barracaInput.value = night.barraca || '';
+                
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modal.classList.add('opacity-100');
+                    modal.querySelector('div').classList.remove('scale-95');
+                }, 10);
+            };
+
+            const closeModal = () => {
+                modal.classList.remove('opacity-100');
+                modal.querySelector('div').classList.add('scale-95');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 300);
+            };
+
+            // --- Event Listeners ---
+            
+            nightsGrid.addEventListener('click', (e) => {
+                if (e.target.classList.contains('register-btn')) {
+                    const nightId = parseInt(e.target.dataset.id, 10);
+                    openModal(nightId);
                 }
 
-                if (!buttonTarget) return;
-                const id = parseInt(buttonTarget.dataset.id);
+                if (e.target.classList.contains('expand-btn')) {
+                    const nightId = parseInt(e.target.dataset.expandId, 10);
+                    const night = nightsData.find(n => n.id === nightId);
+                    if (!night) return;
 
-                if (buttonTarget.classList.contains('edit-btn')) {
-                    editingId = id;
-                    renderTable();
-                } else if (buttonTarget.classList.contains('delete-btn')) {
-                    if (confirm('Tem certeza que deseja excluir este registro?')) {
-                        data = data.filter(item => item.id !== id);
-                        saveData();
-                        renderTable();
-                    }
-                } else if (buttonTarget.classList.contains('save-btn')) {
-                    const row = buttonTarget.closest('tr');
-                    const nome = row.querySelector('input[name="nome"]').value;
-                    const ra = row.querySelector('input[name="ra"]').value;
-                    const senha = row.querySelector('input[name="senha"]').value;
-                    const enviado = row.querySelector('input[name="enviado"]').checked;
+                    const p = e.target.previousElementSibling; // The <p> tag
+                    const lines = night.descricao.split('\n').filter(line => line.trim() !== '');
                     
-                    if (!/^\d*$/.test(ra)) { alert("O campo RA deve conter apenas números."); return; }
-                    if (!nome || !ra || !senha) { alert("Por favor, preencha todos os campos."); return; }
-
-                    if (id === 0) {
-                        const newId = data.length > 0 ? Math.max(...data.map(i => i.id)) + 1 : 1;
-                        data.shift();
-                        data.unshift({ id: newId, nome, ra, senha, enviado });
+                    if (e.target.textContent === 'Ver mais') {
+                        p.textContent = night.descricao;
+                        e.target.textContent = 'Ver menos';
                     } else {
-                        const itemIndex = data.findIndex(item => item.id === id);
-                        data[itemIndex] = { id, nome, ra, senha, enviado };
+                        p.textContent = lines[0] || 'Sem descrição';
+                        e.target.textContent = 'Ver mais';
                     }
-                    editingId = null;
+                }
+            });
+
+            cancelBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal();
+            });
+
+            editForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const id = parseInt(editNightIdInput.value, 10);
+                const night = nightsData.find(n => n.id === id);
+                
+                if (night) {
+                    night.descricao = descricaoInput.value;
+                    night.oferta = parseFloat(ofertaInput.value) || 0;
+                    night.leilao = parseFloat(leilaoInput.value) || 0;
+                    night.barraca = parseFloat(barracaInput.value) || 0;
+                    
                     saveData();
-                    renderTable();
-                } else if (buttonTarget.classList.contains('cancel-btn')) {
-                    if (id === 0) data.shift();
-                    editingId = null;
-                    renderTable();
+                    render();
+                    closeModal();
+                    showToast(`Valores da Noite ${id} salvos com sucesso!`);
                 }
             });
             
-            // --- AÇÕES DO MENU ---
-            document.getElementById('add-btn').addEventListener('click', (e) => {
-                e.preventDefault();
-                if (editingId !== null) { alert('Salve ou cancele a edição atual.'); return; }
-                data.unshift({ id: 0, nome: '', ra: '', senha: '', enviado: false });
-                editingId = 0;
-                renderTable();
-                window.scrollTo(0, 0);
-            });
-
-            document.getElementById('import-btn').addEventListener('click', (e) => {
-                e.preventDefault();
-                fileInput.click();
+            exportBtn.addEventListener('click', () => {
+                const dataStr = JSON.stringify(nightsData, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'festejo_dados.json';
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast("Dados exportados!");
             });
             
-            fileInput.addEventListener('change', (event) => {
-                const file = event.target.files[0];
+            importFile.addEventListener('change', (e) => {
+                const file = e.target.files[0];
                 if (!file) return;
                 const reader = new FileReader();
-                if (file.name.endsWith('.xlsx')) {
-                    reader.onload = (e) => {
-                        const wb = XLSX.read(e.target.result, { type: 'binary' });
-                        const sheet = wb.Sheets[wb.SheetNames[0]];
-                        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
-                        
-                        const jsonData = rows.slice(1).map(row => ({
-                            nome: row[0], ra: row[1], senha: row[2]
-                        }));
-                        importData(jsonData);
-                    };
-                    reader.readAsBinaryString(file);
-                } else if (file.name.endsWith('.json')) {
-                    reader.onload = (e) => {
-                       try {
-                            importData(JSON.parse(e.target.result));
-                        } catch (err) {
-                            alert('Erro ao processar o arquivo JSON. Verifique o formato.');
+                reader.onload = (event) => {
+                    try {
+                        const importedData = JSON.parse(event.target.result);
+                        if (Array.isArray(importedData) && importedData.length === 9 && 'id' in importedData[0]) {
+                            importedData.forEach(n => { if (n.descricao === undefined) n.descricao = ''; });
+                            nightsData = importedData;
+                            saveData();
+                            render();
+                            showToast("Dados importados com sucesso!");
+                        } else {
+                            throw new Error("Formato do arquivo JSON inválido.");
                         }
-                    };
-                    reader.readAsText(file);
-                } else {
-                    alert('Formato de arquivo não suportado (.xlsx ou .json).');
-                }
-                fileInput.value = ''; 
+                    } catch (err) {
+                        showToast(err.message, true);
+                    } finally {
+                        importFile.value = '';
+                    }
+                };
+                reader.readAsText(file);
             });
 
-            const importData = (newData) => {
-                if (!Array.isArray(newData)) { alert('Dados importados inválidos.'); return; }
-                
-                const formattedData = newData
-                    .filter(item => item.nome && item.ra && item.senha)
-                    .map((item, index) => ({
-                        id: index + 1, // IDs reiniciam e seguem a ordem do arquivo
-                        nome: String(item.nome),
-                        ra: String(item.ra).replace(/\D/g, ''),
-                        senha: String(item.senha),
-                        enviado: ['sim', 'true', '1', true].includes(String(item.enviado).toLowerCase())
-                    }));
-                
-                data = formattedData; // SUBSTITUI os dados antigos pelos novos
-                saveData();
-                renderTable();
-                alert(`${formattedData.length} registros importados! Os dados anteriores foram substituídos.`);
-            };
-
-            document.getElementById('export-json-btn').addEventListener('click', (e) => {
-                e.preventDefault();
-                if (data.length === 0) { alert('Não há dados para exportar.'); return; }
-                const blob = new Blob([JSON.stringify(data.map(({id, ...rest}) => rest), null, 2)], { type: 'application/json' });
-                saveAs(blob, 'dados.json');
+            reportBtn.addEventListener('click', () => {
+                const reportHtml = generateHtmlReport();
+                const reportWindow = window.open('', '_blank');
+                reportWindow.document.write(reportHtml);
+                reportWindow.document.close();
             });
 
-            document.getElementById('export-excel-btn').addEventListener('click', (e) => {
-                e.preventDefault();
-                if (data.length === 0) { alert('Não há dados para exportar.'); return; }
-                const dataToExport = data.map(item => ({
-                    'Nome': item.nome, 'RA': item.ra, 'Senha': item.senha, 'Enviado mês X': item.enviado ? 'Sim' : 'Não'
-                }));
-                const ws = XLSX.utils.json_to_sheet(dataToExport);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, 'Dados');
-                XLSX.writeFile(wb, 'dados.xlsx');
+            copyReportBtn.addEventListener('click', () => {
+                const reportText = generatePlainTextReport();
+                copyToClipboard(reportText);
             });
-            
-            renderTable(); // Renderização inicial
+
+            // --- Initial Load ---
+            loadData();
+            render();
         });
     </script>
 </body>
